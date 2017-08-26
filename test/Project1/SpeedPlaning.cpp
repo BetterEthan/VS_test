@@ -6,12 +6,12 @@
 #include "calculate.h"
 float GetAccMax(void)
 {
-	return 0;
+	return 700;
 }
 
 float GetVelMax(void)
 {
-	return 0;
+	return 2000;
 }
 
 
@@ -277,18 +277,14 @@ void SpeedPlaning()
 {
 	float* vell = NULL;
 	float* curvature = NULL;
-	float* wheelOne = NULL;
-	float* wheelTwo = NULL;
-	float* wheelThree = NULL;
+
 
 
 	int n = GetCount();
 
 	vell = (float *)malloc(n * sizeof(float));
 	curvature = (float *)malloc(n * sizeof(float));
-	wheelOne = (float *)malloc(n * sizeof(float));
-	wheelTwo = (float *)malloc(n * sizeof(float));
-	wheelThree = (float *)malloc(n * sizeof(float));
+
 
 
 	for (int i = 0; i < n; i++)
@@ -322,7 +318,8 @@ void SpeedPlaning()
 	}
 
 
-
+	vell[0] = 100;
+	vell[n - 1] = 100;
 
 	float tempVell = 0.0f;
 	//通过v2^2 - v1^2 = 2*a*s对速度再次规划
@@ -354,135 +351,6 @@ void SpeedPlaning()
 	for (int i = 0; i < n; i++)
 	{
 		SetRingBufferPointVell(i + 1, vell[i]);
-	}
-
-
-	//计算此时三个轮的速度
-	CalculateThreeWheelVell(wheelOne, wheelTwo, wheelThree);
-
-	//动态的对速度进行平衡
-	while (1)
-	{
-		int ipoint = 0;
-
-		for (ipoint = 3; ipoint < n; ipoint++)
-		{
-			float time = 0.0f;
-
-			float lll;
-			float vvv;
-			lll = (GetRingBufferPointLen(ipoint) - GetRingBufferPointLen(ipoint - 1));
-			vvv = (GetRingBufferPointVell(ipoint) + GetRingBufferPointVell(ipoint - 1)) / 2;
-			time = lll / vvv;
-
-
-			float a1, a2, a3;
-			//如果判断某一个轮子加速度大于最大加速度时，进行调节
-
-			a1 = (wheelOne[ipoint - 1] - wheelOne[ipoint - 2]) / time;
-			a2 = (wheelTwo[ipoint - 1] - wheelTwo[ipoint - 2]) / time;
-			a3 = (wheelThree[ipoint - 1] - wheelThree[ipoint - 2]) / time;
-			if (((a1 > GetAccMax()) && (wheelOne[ipoint - 1] * wheelOne[ipoint - 2] > 0)) \
-				|| ((a2 > GetAccMax()) && (wheelTwo[ipoint - 1] * wheelTwo[ipoint - 2] > 0))\
-				|| ((a3 > GetAccMax()) && (wheelThree[ipoint - 1] * wheelThree[ipoint - 2] > 0)))
-			{
-				//平衡法规划速度
-				DynamicalAjusting(wheelOne, wheelTwo, wheelThree);
-
-				break;
-			}
-		}
-
-
-		if (ipoint == n)
-		{
-
-			for (int i = 1; i < n; i++)
-			{
-				TriWheelVel_t tempTrueVell;
-				tempTrueVell.v1 = wheelOne[i];
-				tempTrueVell.v2 = wheelTwo[i];
-				tempTrueVell.v3 = wheelThree[i];
-				float vellCar1=0.0f, vellCar2 = 0.0f, vellCar3 = 0.0f, vellCar = 0.0f;
-				float angErr = GetRingBufferPointPoseAngle(i + 2) - GetRingBufferPointPoseAngle(i + 1);
-				angErr = angErr > 180 ? angErr - 360 : angErr;
-				angErr = angErr < -180 ? 360 + angErr : angErr;
-				//粗略计算每两示教点之间的运动的时间
-				float time = (GetRingBufferPointLen(i + 2) - GetRingBufferPointLen(i + 1)) / (GetRingBufferPointVell(i + 2) + GetRingBufferPointVell(i + 1)) * 2;
-
-				//vellCar1 = DecreseVellByOneWheel(GetRingBufferPointVell(i + 1), GetRingBufferPointAngle(i + 1), angErr / time, GetRingBufferPointPoseAngle(i + 1), 1, tempTrueVell.v1);
-
-				//vellCar2 = DecreseVellByOneWheel(GetRingBufferPointVell(i + 1), GetRingBufferPointAngle(i + 1), angErr / time, GetRingBufferPointPoseAngle(i + 1), 2, tempTrueVell.v2);
-
-				//vellCar3 = DecreseVellByOneWheel(GetRingBufferPointVell(i + 1), GetRingBufferPointAngle(i + 1), angErr / time, GetRingBufferPointPoseAngle(i + 1), 3, tempTrueVell.v3);
-
-				if (fabs(vellCar1) >= fabs(vellCar2) && fabs(vellCar1) >= fabs(vellCar3))
-				{
-					vellCar = vellCar1;
-					//将计算的最新合速度放入缓存池中
-					SetRingBufferPointVell(i + 1, vellCar);
-				}
-				else if (fabs(vellCar2) >= fabs(vellCar1) && fabs(vellCar2) >= fabs(vellCar3))
-				{
-					vellCar = vellCar2;
-					//将计算的最新合速度放入缓存池中
-					SetRingBufferPointVell(i + 1, vellCar);
-				}
-				else if (fabs(vellCar3) >= fabs(vellCar2) && fabs(vellCar3) >= fabs(vellCar1))
-				{
-					vellCar = vellCar3;
-					//将计算的最新合速度放入缓存池中
-					SetRingBufferPointVell(i + 1, vellCar);
-				}
-			}
-		}
-
-
-		if (ipoint == n)
-		{
-			SetRingBufferPointVell(1, 100);
-			SetRingBufferPointVell(n, 100);
-			for (int i = 0; i < n - 1; i++)
-			{
-				if (GetRingBufferPointVell(i + 2) > GetRingBufferPointVell(i + 1))
-				{
-					tempVell = sqrt(2 * (1.0f * GetAccMax()) * (GetRingBufferPointLen(i + 2) - GetRingBufferPointLen(i + 1)) + GetRingBufferPointVell(i + 1) * GetRingBufferPointVell(i + 1));
-					if (tempVell < GetRingBufferPointVell(i + 2))
-					{
-						SetRingBufferPointVell(i + 2, tempVell);
-					}
-				}
-			}
-
-
-
-			for (int i = n - 1; i > 0; i--)
-			{
-				if (GetRingBufferPointVell(i) > GetRingBufferPointVell(i + 1))
-				{
-					tempVell = sqrt(2.0f * (1.0f * GetAccMax()) * (GetRingBufferPointLen(i + 1) - GetRingBufferPointLen(i)) + GetRingBufferPointVell(i + 1) * GetRingBufferPointVell(i + 1));
-					if (tempVell < GetRingBufferPointVell(i))
-					{
-						SetRingBufferPointVell(i, tempVell);
-					}
-				}
-			}
-
-			//将速度小于最小速度的做处理
-			for (int i = 2; i < n; i++)
-			{
-				if (GetRingBufferPointVell(i) < MIN_VELL)
-				{
-					SetRingBufferPointVell(i, MIN_VELL);
-				}
-			}
-
-
-			free(wheelOne);
-			free(wheelTwo);
-			free(wheelThree);
-			break;
-		}
 	}
 
 }
